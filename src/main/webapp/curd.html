@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="shortcut icon" href="images/stephy.ico" />
+    <script src="layui/layui.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="layui/css/layui.css" media="all">
+    <script>
+        layui.use(['layer','jquery','table','element','form'],function(){
+            var layer=layui.layer,$=layui.jquery,table=layui.table,element=layui.element,form=layui.form;
+            var tableRender=table.render({
+                url:'getGradeInfo',
+                id:'tableId',
+                elem:'#layTable',
+                page:true,
+                cellMinWidth:100,
+                cols:[[
+                    {checkbox:true},
+                    {field:'id',width:100,sort:true,title:'编号'},
+                    {field:'gradeName',width:200,title:'班级名称'},
+                    {field:'gradeDesc',width:300,title:'班级描述'},
+                    {field:'op',width:300,title:'操作',toolbar:'#tb'},
+                ]]
+            });
+            $('#search').on('click',function() {
+                var reg = /^[\d\s]*$/;
+                var s_id = $('#s_id').val();
+                if (!s_id.match(reg)) {
+                    layer.alert("ID项无效输入", {icon: 5});
+                }else{
+                    if(s_id=='') s_id=0;
+                    tableRender.reload({
+                        url: "getGradeInfo",
+                        where: {
+                            id: s_id,
+                            gradeName: $('#s_name').val()
+                        }
+                    });
+                }
+            });
+            var title='';
+            var url='';
+            var refreshTb=function(){
+                table.reload('tableId',{
+                    url:'getGradeInfo'
+                });
+            };
+            var openFrame=function(version,updateId){
+                var thisIndex=layer.open({
+                    type:1,
+                    content:$('#content'),
+                    area:['310px','316px'],
+                    title:title,
+                    btn:['保存','取消'],
+                    success:function(index,layero){
+                      if($("#formId").children().length>3)
+                      $('#formId').children().first().remove();
+                      if(version=='update'){
+                          $("#formId").children().first().before("<div class='layui-form-item'>" +
+                              "<label class='layui-form-label'>编号</label>"+
+                              "<div class='layui-input-block'>" +
+                                "<input class='layui-input layui-disabled' readonly='readonly' name='id' placeholder="+updateId+" value="+updateId+">"+
+                              "</div>"+
+                          "</div>");
+                      }
+                      form.render();
+                        form.on("submit(save)",function(data){
+                           $.ajax({
+                               url:url,
+                               contentType:'application/json',
+                               dataType:'json',
+                               data:data.field,
+                               success:function(result){
+                                   if(result.success){
+                                       layer.msg('保存成功',{icon:6,time:1000});
+                                       layer.close(thisIndex);
+                                       refreshTb();
+                                   }
+                                   else layer.msg(result.errMsg,{icon:5,time:1800});
+                               }
+                           });
+                        });
+                    },
+                    yes:function(index,layero){
+                        $("#saveBtn").click();
+                    },
+                    btn2:function(index,layero){
+                        layer.close(index);
+                    },
+                    end:function(){
+                        $("input[name='gradeName']").val('');
+                        $("textarea[name='gradeDesc']").val('');
+                    }
+                });
+            };
+            $('#add').click(function(){
+                title='增加班级信息';
+                url='saveGrade';
+                var version='add';
+                openFrame(version,undefined);
+            });
+            var delMethod=function(delId){
+                layer.confirm('确定要删除吗',{icon:3,title:'系统提示'},function(index){
+                    $.post('delGrade',{'delId':delId},function(result){
+                        if(result.success){
+                            layer.msg("删除成功",{icon:6,time:1000});
+                            refreshTb();
+                        }
+                        else layer.msg(result.errMsg,{icon:5,time:1800});
+                    },'json');
+                });
+            };
+            table.on('tool(tableFilter)',function(obj){
+                var event=obj.event;
+                var delId=obj.data.id;
+                if(event=='del') delMethod(delId);
+                else if(event=='edit'){
+                    title='编辑班级信息';
+                    url="saveGrade?version=update";
+                    openFrame('update',delId);
+                }
+            });
+
+            $('#delDulpBtn').click(function(){
+                var checkStatus=table.checkStatus('tableId');
+                var data=checkStatus.data;
+                var length=data.length;
+                var strIds=[];
+                $.each(data,function(key,value){
+                   strIds.push(value.id);
+                });
+                var delId=strIds.join(",");
+                if(length==0) layer.msg("请选择需要删除的行",{icon:5,time:1800});
+                else delMethod(delId);
+            });
+        });
+    </script>
+</head>
+<body>
+<div id="content" style="display:none;">
+                <form class="layui-form layui-form-pane" id="formId">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">班级名称</label>
+                        <div class="layui-input-block">
+                            <input class="layui-input" placeholder="班级名称" aumplete="off" lay-verify="required" name="gradeName">
+                        </div>
+                    </div>
+                    <div class="layui-form-item ">
+                        <label class="layui-form-label">班级描述</label>
+                        <div class="layui-input-block">
+                            <textarea class="layui-textarea" placeholder="班级描述" aumplete="off" name="gradeDesc"></textarea>
+                        </div>
+                    </div>
+                    <button type="button" style="display:none;" id="saveBtn" lay-submit lay-filter="save">保存</button>
+                </form>
+</div>
+    <button class="layui-btn layui-btn-normal" id="add"><i class="layui-icon">&#xe654;</i><span>增加</span></button>
+    <button class="layui-btn layui-btn-danger" id="delDulpBtn"><i class="layui-icon">&#xe640;</i><span>批量删除</span></button>
+    <div class="layui-inline">
+        <input class="layui-input" placeholder="ID" autocomplete="off" name="s_id" id="s_id">
+    </div>
+    <div class="layui-inline">
+        <input class="layui-input" placeholder="班级名称" autocomplete="off" name="s_name" id="s_name">
+    </div>
+    <button class="layui-btn layui-btn-normal" id="search"><i class="layui-icon">&#xe615;</i><span>搜索</span></button>
+    <table id="layTable" lay-filter="tableFilter" class="layui-hidden"></table>
+    <div id="tb" style="display:none;">
+        <button class="layui-btn layui-btn-mini layui-btn-danger" lay-event="del"><i class="layui-icon">&#xe640;</i><span>删除</span></button>
+        <button lay-event="edit" class="layui-btn layui-btn-mini layui-btn-normal"><i class="layui-icon">&#xe642;</i><span>修改</span></button>
+    </div>
+</body>
+</html>
