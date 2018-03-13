@@ -18,7 +18,4 @@ public class jsonUtil {
             if(null!=out) out.close();
         }
     }
-    public String test(){
-        return "ss";
-    }
 }
